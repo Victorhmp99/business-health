@@ -47,7 +47,7 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
 .g-track{height:9px;background:rgba(255,255,255,0.06);border-radius:5px;position:relative;overflow:visible}
 .g-fill{height:100%;border-radius:5px;transition:width .9s cubic-bezier(.4,0,.2,1)}
 .g-limit{position:absolute;top:-5px;bottom:-5px;width:2px;background:rgba(255,255,255,0.18);border-radius:1px}
-.g-limit::after{content:'10d';position:absolute;top:-17px;left:3px;font-size:9px;color:var(--slate);white-space:nowrap}
+.g-limit-lbl{position:absolute;top:-17px;left:3px;font-size:9px;color:var(--slate);white-space:nowrap}
 .g-days{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;text-align:right}
 .client-table{width:100%;border-collapse:collapse}
 .client-table thead th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--slate);padding:0 14px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
@@ -78,6 +78,25 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
 .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:16px;color:var(--slate)}
 .spinner{width:36px;height:36px;border:3px solid rgba(34,197,94,.2);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-scroll .client-table{min-width:760px}
+.tl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tl-scroll .tl-head-row,.tl-scroll .tl-row{min-width:520px}
+@media(max-width:640px){
+  body{overflow-x:hidden}
+  .topbar{padding:0 16px}
+  .container{padding:18px 16px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .kpi{padding:14px 16px}
+  .kpi-val{font-size:26px}
+  .panel{padding:16px}
+  .three-col,.two-col{grid-template-columns:1fr}
+  .gargalo-row{grid-template-columns:108px 1fr 38px 58px;gap:8px}
+  .gargalo-lbl{font-size:10px}
+  .bar-row{grid-template-columns:90px 1fr 36px;gap:8px}
+  .bar-name{font-size:10px}
+  .donut-wrap{flex-direction:column;align-items:flex-start;gap:14px}
+}
 </style>
 </head>
 <body>
@@ -136,11 +155,11 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
 
   <div class="sec-label">Health Score — Todos os Clientes</div>
   <div class="panel" style="padding:20px 0">
+    <div class="table-scroll">
     <table class="client-table">
       <thead>
         <tr>
           <th style="padding-left:24px">Cliente</th>
-          <th>CS</th>
           <th>Dias na Base</th>
           <th>Mês</th>
           <th>Score Camp.</th>
@@ -154,6 +173,7 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
       </thead>
       <tbody id="clientTbody"></tbody>
     </table>
+    </div>
   </div>
 
   <div class="sec-label">Performance Visual</div>
@@ -170,8 +190,9 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
 
   <div class="sec-label">Tracker de Onboarding</div>
   <div class="panel">
-    <div class="panel-title">Dias úteis por etapa — limite máximo: 10 dias</div>
-    <div style="display:grid;grid-template-columns:160px repeat(4,1fr);gap:8px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:4px">
+    <div class="panel-title">Dias úteis por etapa — limite máximo: 5 dias</div>
+    <div class="tl-scroll">
+    <div class="tl-head-row" style="display:grid;grid-template-columns:160px repeat(4,1fr);gap:8px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.07);margin-bottom:4px">
       <div class="tl-head">Cliente</div>
       <div class="tl-head">Contr→Onb</div>
       <div class="tl-head">Onb→Est</div>
@@ -179,6 +200,7 @@ body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--white);mi
       <div class="tl-head">Cri→Camp</div>
     </div>
     <div id="timelineRows"></div>
+    </div>
   </div>
 </div>
 
@@ -209,8 +231,8 @@ function scoreColor(pct) {
 }
 function daysColor(v) {
   if (v === null) return '#475569';
-  if (v > 10) return '#F87171';
-  if (v > 8)  return '#FCD34D';
+  if (v > 5) return '#F87171';
+  if (v > 4)  return '#FCD34D';
   return '#4ADE80';
 }
 function badgeHTML(s) {
@@ -261,12 +283,10 @@ async function loadAll() {
     // Gargalo: só linhas com "→"
     const gargData = gargRows.filter(r => String(r[0]||'').includes('→'));
 
-    // CS map
-    const csMap = {};
+    // CS map (mantido internamente, não exibido na tabela)
     const diasMap = {};
     cliData.forEach(r => {
       if (r[0]) {
-        csMap[String(r[0]).trim().toLowerCase()] = String(r[1]||'—');
         diasMap[String(r[0]).trim().toLowerCase()] = r[14];
       }
     });
@@ -339,7 +359,6 @@ async function loadAll() {
     tbody.innerHTML = '';
     sorted.forEach(r => {
       const nome = String(r[0]||'').trim();
-      const cs   = csMap[nome.toLowerCase()] || '—';
       const dias = num(diasMap[nome.toLowerCase()]);
       const sc=num(r[11]), sb=num(r[12]), sp=num(r[13]), hs=num(r[14]);
       const hc   = scoreColor(hs);
@@ -348,7 +367,6 @@ async function loadAll() {
         : `<span style="color:#475569">—</span>`;
       tbody.innerHTML += `<tr>
         <td class="name" style="padding-left:24px">${nome}</td>
-        <td>${cs}</td>
         <td class="mono">${dias??'—'}</td>
         <td>${String(r[1]||'—')}</td>
         <td class="mono" style="color:${scoreColor(sc!==null?sc/40*100:null)}">${sc??'—'}</td>
@@ -470,7 +488,6 @@ function renderGargalo(rows) {
       <div class="gargalo-lbl">${lbl}</div>
       <div class="g-track">
         <div class="g-fill" style="width:${pct}%;background:${c}"></div>
-        <div class="g-limit" style="left:${lim}%"></div>
       </div>
       <div class="g-days" style="color:${c}">${avg!==null?avg+'d':'—'}</div>
       ${tag}
